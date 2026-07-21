@@ -1,9 +1,14 @@
-/* Heltec Automation Receive
+/* Heltec Automation Receive + OLED output
  */
 
 #include "LoRaWan_APP.h"
 #include "Arduino.h"
 
+// OLED (I2C, встроенный дисплей Heltec)
+#include <Wire.h>
+#include "HT_SSD1306Wire.h"
+
+static SSD1306Wire display(0x3c, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RST_OLED);
 
 /*#define RF_FREQUENCY                                915000000 // Hz */
 #define RF_FREQUENCY                                868900000 // Hz
@@ -36,17 +41,71 @@ static RadioEvents_t RadioEvents;
 
 int16_t txNumber;
 
-int16_t rssi,rxSize;
+int16_t rssi, rxSize;
+int8_t  lastSnr = 0;
+uint32_t rxCount = 0;
 
 bool lora_idle = true;
 
+// Включение питания OLED (Vext) на платах Heltec
+void VextON(void)
+{
+  pinMode(Vext, OUTPUT);
+  digitalWrite(Vext, LOW);
+}
+
+void VextOFF(void)
+{
+  pinMode(Vext, OUTPUT);
+  digitalWrite(Vext, HIGH);
+}
+
+// Экран ожидания приёма
+void drawWaitingScreen()
+{
+  display.clear();
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.setFont(ArialMT_Plain_10);
+  display.drawString(0, 0, "LoRa Receiver");
+  display.drawString(0, 20, "Waiting for packet...");
+  display.drawString(0, 40, "RX total: " + String(rxCount));
+  display.display();
+}
+
+// Экран с данными последнего принятого пакета
+void drawPacketScreen()
+{
+  display.clear();
+
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.setFont(ArialMT_Plain_10);
+  display.drawString(0, 0, "LoRa RX #" + String(rxCount));
+
+  display.setFont(ArialMT_Plain_16);
+  // Ограничиваем ширину, чтобы длинный пакет не вылезал за экран
+  display.drawStringMaxWidth(0, 14, 128, String(rxpacket));
+
+  display.setFont(ArialMT_Plain_10);
+  display.drawString(0, 44, "RSSI: " + String(rssi) + " dBm");
+  display.drawString(64, 44, "SNR: " + String(lastSnr));
+  display.drawString(0, 54, "Len: " + String(rxSize) + " bytes");
+
+  display.display();
+}
+
 void setup() {
     Serial.begin(115200);
-    Mcu.begin(HELTEC_BOARD,SLOW_CLK_TPYE);
-    
-    txNumber=0;
-    rssi=0;
-  
+    Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
+
+    // Инициализация OLED
+    VextON();
+    delay(100);
+    display.init();
+    display.setFont(ArialMT_Plain_10);
+
+    txNumber = 0;
+    rssi = 0;
+
     RadioEvents.RxDone = OnRxDone;
     Radio.Init( &RadioEvents );
     Radio.SetChannel( RF_FREQUENCY );
@@ -54,6 +113,8 @@ void setup() {
                                LORA_CODINGRATE, 0, LORA_PREAMBLE_LENGTH,
                                LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON,
                                0, true, 0, 0, LORA_IQ_INVERSION_ON, true );
+
+    drawWaitingScreen();
 }
 
 
@@ -69,13 +130,21 @@ void loop()
   Radio.IrqProcess( );
 }
 
-void OnRxDone( uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr )
+void OnRxDone( uint8_t *payload, uint16_t size, int16_t rssi_in, int8_t snr )
 {
-    rssi=rssi;
-    rxSize=size;
-    memcpy(rxpacket, payload, size );
-    rxpacket[size]='\0';
+    rssi = rssi_in;
+    lastSnr = snr;
+    rxSize = size;
+    rxCount++;
+
+    memcpy(rxpacket, payload, size);
+    rxpacket[size] = '\0';
+
     Radio.Sleep( );
-    Serial.printf("\r\nreceived packet => \"%s\" with rssi %d , length %d\r\n",rxpacket,rssi,rxSize);
+
+    Serial.printf("\r\nreceived packet => \"%s\" with rssi %d , length %d\r\n", rxpacket, rssi, rxSize);
+
+    drawPacketScreen();
+
     lora_idle = true;
 }
