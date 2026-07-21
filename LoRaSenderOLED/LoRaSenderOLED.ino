@@ -146,7 +146,7 @@ void loop()
 	{
     delay(1000);
 		txNumber += 0.01;
-		sprintf(txpacket,"Hello LoRa world number %0.2f",txNumber);  //start a package
+		sprintf(txpacket,"Hello LoRa %0.2f",txNumber);  //start a package
    
 		Serial.printf("\r\nsending packet \"%s\" , length %d\r\n",txpacket, strlen(txpacket));
 

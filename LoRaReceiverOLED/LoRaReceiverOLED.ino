@@ -80,7 +80,7 @@ void drawPacketScreen()
   display.setFont(ArialMT_Plain_10);
 
   // Строка 0: номер пакета
-  display.drawString(0, 0, "RX #" + String(rxCount));
+  display.drawString(0, 0, "LoRa RX #" + String(rxCount));
 
   // Строка 1: сам пакет (ограничение по ширине на случай длинного текста)
   display.drawStringMaxWidth(0, 12, 128, String(rxpacket));
