@@ -66,29 +66,30 @@ void drawWaitingScreen()
   display.clear();
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.setFont(ArialMT_Plain_10);
-  display.drawString(0, 0, "LoRa Receiver");
-  display.drawString(0, 20, "Waiting for packet...");
-  display.drawString(0, 40, "RX total: " + String(rxCount));
+  display.drawString(0, 0,  "LoRa Receiver");
+  display.drawString(0, 12, "Waiting for packet...");
+  display.drawString(0, 24, "RX total: " + String(rxCount));
   display.display();
 }
 
-// Экран с данными последнего принятого пакета
+// Экран с данными последнего принятого пакета (компактная раскладка, шрифт 10pt)
 void drawPacketScreen()
 {
   display.clear();
-
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.setFont(ArialMT_Plain_10);
-  display.drawString(0, 0, "LoRa RX #" + String(rxCount));
 
-  display.setFont(ArialMT_Plain_16);
-  // Ограничиваем ширину, чтобы длинный пакет не вылезал за экран
-  display.drawStringMaxWidth(0, 14, 128, String(rxpacket));
+  // Строка 0: номер пакета
+  display.drawString(0, 0, "RX #" + String(rxCount));
 
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(0, 44, "RSSI: " + String(rssi) + " dBm");
-  display.drawString(64, 44, "SNR: " + String(lastSnr));
-  display.drawString(0, 54, "Len: " + String(rxSize) + " bytes");
+  // Строка 1: сам пакет (ограничение по ширине на случай длинного текста)
+  display.drawStringMaxWidth(0, 12, 128, String(rxpacket));
+
+  // Строка 2: RSSI и SNR в одной строке
+  display.drawString(0, 32, "RSSI:" + String(rssi) + " SNR:" + String(lastSnr));
+
+  // Строка 3: длина пакета
+  display.drawString(0, 44, "Len: " + String(rxSize) + " B");
 
   display.display();
 }
