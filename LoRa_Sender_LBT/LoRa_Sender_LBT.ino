@@ -5,15 +5,6 @@
  * 1. Send data from a esp32 device over hardware
  * 2. Перед отправкой прослушивать канал (RSSI-based LBT) и,
  *    если канал занят, ждать с рандомизированным бэкоффом
- *
- * Description:
- *
- * HelTec AutoMation, Chengdu, China
- * 成都惠利特自动化科技有限公司
- * www.heltec.org
- *
- * this project also realess in GitHub:
- * https://github.com/Heltec-Aaron-Lee/WiFi_Kit_series
  * */
 
 #include "LoRaWan_APP.h"
@@ -43,7 +34,6 @@ static SSD1306Wire display(0x3c, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RS
 #define LORA_SYMBOL_TIMEOUT                         0         // Symbols
 #define LORA_FIX_LENGTH_PAYLOAD_ON                  false
 #define LORA_IQ_INVERSION_ON                        false
-
 
 #define RX_TIMEOUT_VALUE                            1000
 #define BUFFER_SIZE                                 30 // Define the payload size here
@@ -196,8 +186,6 @@ void setup() {
     display.drawString(0, 20, "Ready to send...");
     display.display();
    }
-
-
 
 void loop()
 {
