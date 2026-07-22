@@ -19,7 +19,7 @@ static SSD1306Wire display(0x3c, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RS
 /*#define RF_FREQUENCY                                915000000 // Hz */
 #define RF_FREQUENCY                                868900000 // Hz
 
-#define TX_OUTPUT_POWER                             5        // dBm
+#define TX_OUTPUT_POWER                             -9        // dBm
 
 #define LORA_BANDWIDTH                              0         // [0: 125 kHz,
                                                               //  1: 250 kHz,
@@ -164,7 +164,6 @@ void setup() {
     display.init();
     display.setFont(ArialMT_Plain_10);
 
-    // random() используется для бэкоффа LBT — инициализируем ГПСЧ
     randomSeed(esp_random());
 
     txNumber=0;
