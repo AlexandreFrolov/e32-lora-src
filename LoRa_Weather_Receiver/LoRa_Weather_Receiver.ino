@@ -105,7 +105,7 @@ void drawPacketScreen()
   display.drawString(0, 14, "T: "   + String(rxPacket.temperature, 1)  + " C");
   display.drawString(0, 26, "P: "   + String(rxPacket.pressure, 1)     + " hPa");
   display.drawString(0, 38, "H: "   + String(rxPacket.humidity, 1)     + " %");
-  display.drawString(0, 50, "Lux: " + String(rxPacket.illumination, 0) + " lx (" + String(rxSize) + "B)");
+  // display.drawString(0, 50, "Lux: " + String(rxPacket.illumination, 0) + " lx (" + String(rxSize) + "B)");
 
   display.display();
 }

@@ -1,5 +1,5 @@
 /* Heltec Automation — передатчик метеоданных BME280 по LoRa + OLED
- * с поддержкой LBT (Listen Before Talk)
+ * С поддержкой LBT (Listen Before Talk) и циклом Deep Sleep (1 минута)
  */
 
 #include "LoRaWan_APP.h"
@@ -27,6 +27,10 @@ static SSD1306Wire display(0x3c, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RS
 
 #define RX_TIMEOUT_VALUE             1000
 
+// ---------- Настройки Deep Sleep ----------
+#define US_TO_S_FACTOR               1000000ULL /* Множитель для перевода микросекунд в секунды */
+#define TIME_TO_SLEEP                60         /* Время сна в секундах (1 минута) */
+
 // ---------- Параметры LBT ----------
 #define LBT_RSSI_THRESHOLD           -80       // dBm
 #define LBT_CARRIER_SENSE_TIME       5         // ms
@@ -50,9 +54,11 @@ typedef struct {
 WeatherPacket txPacket;
 uint8_t txBuffer[BUFFER_SIZE];
 
+// Переменные в RTC-памяти (сохраняются при Deep Sleep)
+RTC_DATA_ATTR uint32_t txCount = 0;
+RTC_DATA_ATTR uint32_t txSkippedCount = 0;
+
 bool lora_idle = true;
-uint32_t txCount = 0;
-uint32_t txSkippedCount = 0;
 bool lastTxOk = true;
 
 // ---------- BME280 ----------
@@ -199,18 +205,30 @@ bool waitForFreeChannel() {
   return channelFree;
 }
 
+void goToSleep() {
+  Serial.println("Going to Deep Sleep for 60 seconds...");
+  
+  // Управление периферией перед сном
+  Radio.Sleep();      // Перевод радиомодуля SX1262 в спящий режим
+  display.sleep();    // Перевод дисплея в спящий режим
+  VextOFF();          // Отключение питания внешних датчиков (BME280) и OLED
+  
+  // Настройка таймера пробуждения
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * US_TO_S_FACTOR);
+  
+  // Переход в глубокий сон
+  esp_deep_sleep_start();
+}
+
 void setup() {
   Serial.begin(115200);
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
 
   VextON();
-  delay(300);
+  delay(100);
 
   display.init();
   display.setFont(ArialMT_Plain_10);
-  display.clear();
-  display.drawString(0, 0, "Initializing BME280...");
-  display.display();
 
   // Инициализация датчика BME280 на Wire1
   initBME280();
@@ -227,39 +245,41 @@ void setup() {
                     LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
                     true, 0, 0, LORA_IQ_INVERSION_ON, 3000);
 
-  display.clear();
-  display.drawString(0, 0, "Sender Ready");
-  display.drawString(0, 16, "BME280: " + String(bme_ok ? "OK" : "FAIL"));
-  display.drawString(0, 32, "Addr: 0x" + String(bmeAddr, HEX));
-  display.display();
-  delay(1500);
+  // --- Выполнение передачи ---
+  fillWeatherPacket(txPacket);
+  memcpy(txBuffer, &txPacket, BUFFER_SIZE);
+
+  if (!waitForFreeChannel()) {
+    txSkippedCount++;
+    Serial.println("LBT: Channel busy, skipping TX");
+    goToSleep();
+  }
+
+  Serial.printf("\r\nTX #%lu: T=%.1f C, P=%.1f hPa, H=%.1f %%\r\n",
+                (unsigned long)txPacket.packetId, txPacket.temperature,
+                txPacket.pressure, txPacket.humidity);
+
+  txCount++;
+  drawSendingScreen(txPacket);
+
+  lora_idle = false;
+  Radio.Send(txBuffer, BUFFER_SIZE);
+
+  // Ожидание завершения передачи (обработка прерываний SX1262)
+  while (!lora_idle) {
+    Radio.IrqProcess();
+  }
+
+  // Задержка на 2 секунды, чтобы успеть рассмотреть результат на экране
+  delay(2000);
+
+  // Переход в режим глубокого сна
+  goToSleep();
 }
 
 void loop() {
-  if (lora_idle) {
-    delay(2000); // Интервал опроса/отправки
-
-    fillWeatherPacket(txPacket);
-    memcpy(txBuffer, &txPacket, BUFFER_SIZE);
-
-    if (!waitForFreeChannel()) {
-      txSkippedCount++;
-      Serial.println("LBT: Channel busy, skipping TX");
-      lora_idle = true;
-      return;
-    }
-
-    Serial.printf("\r\nTX #%lu: T=%.1f C, P=%.1f hPa, H=%.1f %%\r\n",
-                  (unsigned long)txPacket.packetId, txPacket.temperature,
-                  txPacket.pressure, txPacket.humidity);
-
-    txCount++;
-    drawSendingScreen(txPacket);
-
-    Radio.Send(txBuffer, BUFFER_SIZE);
-    lora_idle = false;
-  }
-  Radio.IrqProcess();
+  // Вся логика выполняется в setup(). Пустой loop() никогда не выполнится,
+  // так как в конце setup() плата уходит в deep sleep и перезагружается.
 }
 
 void OnTxDone(void) {
